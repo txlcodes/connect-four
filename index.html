@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Connect Four</title>
+<meta name="description" content="A cozy two-player Connect Four game — drop discs on a walnut-framed board and connect four in a row." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔴</text></svg>" />
+<style>
+  :root{
+    --paper:#EEEDE1;
+    --paper-2:#E4E2D2;
+    --ink:#1C1A15;
+    --ink-soft:#4A4638;
+    --wood:#6B4226;
+    --wood-dark:#4A2C18;
+    --wood-light:#8A5A38;
+    --board:#1F4D3E;
+    --board-dark:#123328;
+    --board-hole:#EAE7D8;
+    --red:#B23A48;
+    --red-dark:#7E2634;
+    --red-light:#D0616D;
+    --gold:#D4A93E;
+    --gold-dark:#9C7A28;
+    --gold-light:#E7C876;
+    --glow:#F2D77E;
+    --shadow: 0 18px 40px -12px rgba(18,51,40,0.45);
+    --radius-lg: 28px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#15130F;
+      --paper-2:#1B1913;
+      --ink:#EFEAD9;
+      --ink-soft:#B3AC96;
+      --board:#0E2B22;
+      --board-dark:#081C16;
+      --board-hole:#1B1913;
+      --wood:#4A2C18;
+      --wood-dark:#2E1A0E;
+      --wood-light:#6B4226;
+      --shadow: 0 18px 44px -12px rgba(0,0,0,0.6);
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%, color-mix(in srgb, var(--gold) 10%, transparent), transparent),
+      var(--paper);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:2.5rem 1.25rem 3.5rem;
+    overflow-x:hidden;
+  }
+
+  .serif{
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  }
+
+  .wrap{
+    width:100%;
+    max-width:640px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:1.6rem;
+  }
+
+  header{
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:0.4rem;
+  }
+  .eyebrow{
+    font-size:0.72rem;
+    letter-spacing:0.22em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    font-weight:600;
+  }
+  h1{
+    font-size:clamp(2.2rem, 7vw, 3.2rem);
+    margin:0;
+    font-weight:600;
+    letter-spacing:0.01em;
+    text-wrap:balance;
+    color:var(--ink);
+  }
+  h1 em{
+    font-style:normal;
+    color:var(--red);
+  }
+  .tagline{
+    color:var(--ink-soft);
+    font-size:0.95rem;
+    max-width:32ch;
+  }
+
+  .players{
+    width:100%;
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    align-items:center;
+    gap:0.75rem;
+  }
+  .player-card{
+    background:var(--paper-2);
+    border-radius:18px;
+    padding:0.85rem 1rem;
+    display:flex;
+    align-items:center;
+    gap:0.7rem;
+    border:2px solid transparent;
+    transition:border-color .25s ease, transform .25s ease, box-shadow .25s ease;
+    min-width:0;
+  }
+  .player-card.active{
+    border-color:var(--turn-color, var(--red));
+    box-shadow:0 0 0 4px color-mix(in srgb, var(--turn-color, var(--red)) 16%, transparent);
+    transform:translateY(-2px);
+  }
+  .p2 .player-card{ flex-direction:row-reverse; text-align:right; }
+  .chip{
+    width:34px;height:34px;border-radius:50%;flex:none;
+    box-shadow:inset 0 -4px 6px rgba(0,0,0,0.25), inset 0 3px 4px rgba(255,255,255,0.35), 0 2px 4px rgba(0,0,0,0.25);
+  }
+  .chip.red{ background:radial-gradient(circle at 32% 28%, var(--red-light), var(--red) 55%, var(--red-dark) 100%); }
+  .chip.gold{ background:radial-gradient(circle at 32% 28%, var(--gold-light), var(--gold) 55%, var(--gold-dark) 100%); }
+
+  .player-meta{ min-width:0; display:flex; flex-direction:column; gap:0.1rem; }
+  .player-name{
+    font-weight:600;
+    font-size:0.92rem;
+    background:transparent;
+    border:none;
+    color:var(--ink);
+    padding:0;
+    width:100%;
+    font-family:inherit;
+    outline:none;
+    border-bottom:1px solid transparent;
+  }
+  .p2 .player-name{ text-align:right; }
+  .player-name:focus{ border-bottom-color:var(--ink-soft); }
+  .score{
+    font-size:0.76rem;
+    color:var(--ink-soft);
+    font-variant-numeric:tabular-nums;
+  }
+  .vs{
+    font-family:"Iowan Old Style","Palatino Linotype",Georgia,serif;
+    font-style:italic;
+    color:var(--ink-soft);
+    font-size:0.95rem;
+  }
+
+  .status{
+    min-height:1.6rem;
+    font-size:0.95rem;
+    font-weight:600;
+    color:var(--ink);
+    text-align:center;
+  }
+  .status .name-hl{ color:var(--turn-color, var(--red)); }
+
+  .board-frame{
+    position:relative;
+    background:
+      linear-gradient(155deg, var(--wood-light), var(--wood) 45%, var(--wood-dark) 100%);
+    border-radius:var(--radius-lg);
+    padding:14px;
+    box-shadow:var(--shadow), inset 0 2px 2px rgba(255,255,255,0.15), inset 0 -6px 10px rgba(0,0,0,0.35);
+  }
+  .board-frame::before{
+    content:"";
+    position:absolute; inset:0;
+    border-radius:var(--radius-lg);
+    background-image:repeating-linear-gradient(100deg, rgba(0,0,0,0.05) 0 2px, transparent 2px 7px);
+    opacity:0.5;
+    pointer-events:none;
+  }
+  .cols{
+    position:relative;
+    display:grid;
+    grid-template-columns:repeat(7, 1fr);
+    gap:clamp(4px,1.2vw,8px);
+    background:linear-gradient(160deg, var(--board), var(--board-dark));
+    border-radius:18px;
+    padding:clamp(6px,1.6vw,10px);
+    box-shadow:inset 0 6px 14px rgba(0,0,0,0.45), inset 0 -2px 4px rgba(255,255,255,0.06);
+  }
+  .col{
+    display:flex;
+    flex-direction:column-reverse;
+    gap:clamp(4px,1.2vw,8px);
+    cursor:pointer;
+    border-radius:10px;
+    position:relative;
+  }
+  .col:focus-visible{ outline:2px solid var(--glow); outline-offset:2px; }
+  .col.disabled{ cursor:default; }
+  .cell{
+    position:relative;
+    aspect-ratio:1/1;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--board-hole), color-mix(in srgb, var(--board-hole) 85%, black 15%));
+    box-shadow:inset 0 4px 8px rgba(0,0,0,0.35), inset 0 -2px 3px rgba(255,255,255,0.25);
+    overflow:visible;
+  }
+  .col:not(.disabled):hover .cell{ filter:brightness(1.03); }
+
+  .disc{
+    position:absolute; inset:0;
+    border-radius:50%;
+    transform:translateY(-620%) scale(0.9);
+    opacity:0;
+  }
+  .disc.dropped{
+    animation: drop var(--fall-time, 0.55s) cubic-bezier(.5,0,.75,0) forwards;
+  }
+  .disc.red{ background:radial-gradient(circle at 32% 26%, var(--red-light), var(--red) 55%, var(--red-dark) 100%); }
+  .disc.gold{ background:radial-gradient(circle at 32% 26%, var(--gold-light), var(--gold) 55%, var(--gold-dark) 100%); }
+  .disc.win{
+    animation: drop var(--fall-time, 0.55s) cubic-bezier(.5,0,.75,0) forwards, pulse 1.1s ease-in-out 0.4s 3;
+  }
+  .disc.win::after{
+    content:"";
+    position:absolute; inset:-14%;
+    border-radius:50%;
+    box-shadow:0 0 22px 6px var(--glow);
+    opacity:0.85;
+    animation: pulse 1.1s ease-in-out 0.4s 3;
+  }
+
+  @keyframes drop{
+    0%{ transform:translateY(-620%) scale(0.92); opacity:1; }
+    72%{ transform:translateY(4%) scale(1); opacity:1; }
+    84%{ transform:translateY(-3%) scale(1); }
+    100%{ transform:translateY(0) scale(1); opacity:1; }
+  }
+  @keyframes pulse{
+    0%,100%{ filter:brightness(1); }
+    50%{ filter:brightness(1.35); }
+  }
+
+  .ghost{
+    position:absolute;
+    top:-13%;
+    left:0; right:0;
+    aspect-ratio:1/1;
+    margin:0 auto;
+    border-radius:50%;
+    opacity:0;
+    transition:opacity .15s ease;
+    pointer-events:none;
+    z-index:2;
+  }
+  .col:not(.disabled):hover .ghost{ opacity:0.55; }
+  .ghost.red{ background:radial-gradient(circle at 32% 26%, var(--red-light), var(--red) 55%, var(--red-dark) 100%); }
+  .ghost.gold{ background:radial-gradient(circle at 32% 26%, var(--gold-light), var(--gold) 55%, var(--gold-dark) 100%); }
+
+  .controls{
+    display:flex;
+    gap:0.75rem;
+    align-items:center;
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  button.action{
+    font-family:inherit;
+    font-weight:600;
+    font-size:0.85rem;
+    letter-spacing:0.01em;
+    padding:0.7rem 1.4rem;
+    border-radius:999px;
+    border:1.5px solid var(--wood);
+    background:var(--paper);
+    color:var(--ink);
+    cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  button.action:hover{ transform:translateY(-1px); box-shadow:0 6px 14px -6px rgba(0,0,0,0.3); }
+  button.action:active{ transform:translateY(0); }
+  button.action.primary{
+    background:linear-gradient(155deg, var(--wood-light), var(--wood));
+    color:#F4EFE2;
+    border-color:var(--wood-dark);
+  }
+  button.action.ghost{
+    border-color:transparent;
+    background:transparent;
+    color:var(--ink-soft);
+  }
+
+  footer{
+    color:var(--ink-soft);
+    font-size:0.78rem;
+    text-align:center;
+    max-width:34ch;
+  }
+
+  canvas#confetti{
+    position:fixed; inset:0;
+    pointer-events:none;
+    z-index:50;
+  }
+
+  @media (max-width:480px){
+    .player-name{ font-size:0.82rem; }
+    .score{ font-size:0.7rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .disc.dropped, .disc.win, .disc.win::after{ animation:none !important; transform:translateY(0); opacity:1; }
+    button.action:hover{ transform:none; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Two Player · Local</div>
+    <h1 class="serif">Connect <em>Four</em></h1>
+    <p class="tagline">Drop your piece, line up four in a row — across, up, or on the slant.</p>
+  </header>
+
+  <div class="players">
+    <div class="player-card p1 active" id="card1" style="--turn-color:var(--red)">
+      <span class="chip red"></span>
+      <div class="player-meta">
+        <input class="player-name" id="name1" value="You" maxlength="16" aria-label="Player one name" />
+        <span class="score" id="score1">0 wins</span>
+      </div>
+    </div>
+    <span class="vs">vs</span>
+    <div class="player-card p2" id="card2" style="--turn-color:var(--gold)">
+      <div class="player-meta">
+        <input class="player-name" id="name2" value="Her" maxlength="16" aria-label="Player two name" />
+        <span class="score" id="score2">0 wins</span>
+      </div>
+      <span class="chip gold"></span>
+    </div>
+  </div>
+
+  <p class="status serif" id="status"></p>
+
+  <div class="board-frame">
+    <div class="cols" id="cols" role="grid" aria-label="Connect Four board"></div>
+  </div>
+
+  <div class="controls">
+    <button class="action primary" id="newGameBtn">New Game</button>
+    <button class="action ghost" id="resetScoreBtn">Reset Scores</button>
+  </div>
+
+  <footer>Tap a column to drop your piece. First to four in a row wins the round.</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var ROWS = 6, COLS = 7;
+  var board = [];
+  var current = 1;
+  var gameOver = false;
+  var scores = {1:0, 2:0};
+
+  var colsEl = document.getElementById('cols');
+  var statusEl = document.getElementById('status');
+  var card1 = document.getElementById('card1');
+  var card2 = document.getElementById('card2');
+  var name1 = document.getElementById('name1');
+  var name2 = document.getElementById('name2');
+  var score1El = document.getElementById('score1');
+  var score2El = document.getElementById('score2');
+
+  try{
+    var savedNames = JSON.parse(localStorage.getItem('c4-names') || 'null');
+    if(savedNames){ name1.value = savedNames[0]; name2.value = savedNames[1]; }
+    var savedScores = JSON.parse(localStorage.getItem('c4-scores') || 'null');
+    if(savedScores){ scores = savedScores; }
+  }catch(e){}
+
+  function saveNames(){
+    try{ localStorage.setItem('c4-names', JSON.stringify([name1.value||'Player 1', name2.value||'Player 2'])); }catch(e){}
+  }
+  function saveScores(){
+    try{ localStorage.setItem('c4-scores', JSON.stringify(scores)); }catch(e){}
+  }
+  name1.addEventListener('input', saveNames);
+  name2.addEventListener('input', saveNames);
+
+  function playerName(p){ return (p===1 ? name1.value : name2.value) || ('Player ' + p); }
+  function playerColor(p){ return p===1 ? 'red' : 'gold'; }
+
+  function buildBoard(){
+    board = [];
+    colsEl.innerHTML = '';
+    for(var c=0;c<COLS;c++){
+      board.push(new Array(ROWS).fill(0));
+      var colEl = document.createElement('div');
+      colEl.className = 'col';
+      colEl.dataset.col = c;
+      colEl.setAttribute('role','button');
+      colEl.setAttribute('tabindex','0');
+      colEl.setAttribute('aria-label', 'Drop in column ' + (c+1));
+
+      var ghost = document.createElement('div');
+      ghost.className = 'ghost ' + playerColor(current);
+      colEl.appendChild(ghost);
+
+      for(var r=0;r<ROWS;r++){
+        var cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.row = r;
+        colEl.appendChild(cell);
+      }
+      colEl.addEventListener('click', function(){ handleMove(parseInt(this.dataset.col,10)); });
+      colEl.addEventListener('keydown', function(e){
+        if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); handleMove(parseInt(this.dataset.col,10)); }
+      });
+      colsEl.appendChild(colEl);
+    }
+    updateGhosts();
+  }
+
+  function updateGhosts(){
+    var ghosts = colsEl.querySelectorAll('.ghost');
+    ghosts.forEach(function(g){
+      g.classList.remove('red','gold');
+      g.classList.add(playerColor(current));
+    });
+  }
+
+  function updateActiveCard(){
+    card1.classList.toggle('active', current===1 && !gameOver);
+    card2.classList.toggle('active', current===2 && !gameOver);
+  }
+
+  function updateStatus(text){
+    statusEl.innerHTML = text;
+  }
+
+  function turnStatus(){
+    updateStatus('<span class="name-hl" style="--turn-color:var(--' + playerColor(current) + ')">' + escapeHtml(playerName(current)) + '</span>’s turn');
+  }
+
+  function escapeHtml(s){
+    var d = document.createElement('div'); d.innerText = s; return d.innerHTML;
+  }
+
+  function lowestEmptyRow(c){
+    for(var r=0;r<ROWS;r++){ if(board[c][r]===0) return r; }
+    return -1;
+  }
+
+  function handleMove(c){
+    if(gameOver) return;
+    var r = lowestEmptyRow(c);
+    if(r === -1) return;
+    board[c][r] = current;
+
+    var colEl = colsEl.children[c];
+    colEl.classList.add('disabled');
+    var cellEl = colEl.querySelector('.cell[data-row="' + r + '"]');
+    var disc = document.createElement('div');
+    disc.className = 'disc ' + playerColor(current);
+    var fallTime = 0.36 + (ROWS - 1 - r) * 0.045;
+    disc.style.setProperty('--fall-time', fallTime + 's');
+    cellEl.appendChild(disc);
+    requestAnimationFrame(function(){ disc.classList.add('dropped'); });
+
+    var winLine = checkWin(c, r);
+    var isDraw = !winLine && boardFull();
+
+    setTimeout(function(){
+      colEl.classList.remove('disabled');
+      if(winLine){
+        winLine.forEach(function(pos){
+          var el = colsEl.children[pos[0]].querySelector('.cell[data-row="' + pos[1] + '"] .disc');
+          if(el) el.classList.add('win');
+        });
+        gameOver = true;
+        scores[current]++;
+        score1El.textContent = scores[1] + (scores[1]===1?' win':' wins');
+        score2El.textContent = scores[2] + (scores[2]===1?' win':' wins');
+        saveScores();
+        updateStatus('<span class="name-hl" style="--turn-color:var(--' + playerColor(current) + ')">' + escapeHtml(playerName(current)) + ' wins!</span> • four in a row');
+        updateActiveCard();
+        burstConfetti(playerColor(current));
+      } else if(isDraw){
+        gameOver = true;
+        updateStatus('It’s a draw — board’s full');
+        updateActiveCard();
+      } else {
+        current = current === 1 ? 2 : 1;
+        updateGhosts();
+        updateActiveCard();
+        turnStatus();
+      }
+    }, gameOver ? 0 : fallTime*1000*0.85);
+  }
+
+  function boardFull(){
+    for(var c=0;c<COLS;c++){ if(board[c][ROWS-1]===0) return false; }
+    return true;
+  }
+
+  function checkWin(c, r){
+    var p = board[c][r];
+    var dirs = [[1,0],[0,1],[1,1],[1,-1]];
+    for(var d=0; d<dirs.length; d++){
+      var dx = dirs[d][0], dy = dirs[d][1];
+      var line = [[c,r]];
+      for(var s=1; s<4; s++){
+        var nc = c+dx*s, nr = r+dy*s;
+        if(nc<0||nc>=COLS||nr<0||nr>=ROWS||board[nc][nr]!==p) break;
+        line.push([nc,nr]);
+      }
+      for(var s2=1; s2<4; s2++){
+        var nc2 = c-dx*s2, nr2 = r-dy*s2;
+        if(nc2<0||nc2>=COLS||nr2<0||nr2>=ROWS||board[nc2][nr2]!==p) break;
+        line.unshift([nc2,nr2]);
+      }
+      if(line.length >= 4) return line.slice(0,4);
+    }
+    return null;
+  }
+
+  function newGame(){
+    gameOver = false;
+    current = 1;
+    buildBoard();
+    updateActiveCard();
+    turnStatus();
+  }
+
+  document.getElementById('newGameBtn').addEventListener('click', newGame);
+  document.getElementById('resetScoreBtn').addEventListener('click', function(){
+    scores = {1:0,2:0};
+    score1El.textContent = '0 wins';
+    score2El.textContent = '0 wins';
+    saveScores();
+  });
+
+  var canvas = document.getElementById('confetti');
+  var ctx = canvas.getContext('2d');
+  var particles = [];
+  var confettiRunning = false;
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function resizeCanvas(){
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  function burstConfetti(color){
+    if(reduceMotion) return;
+    var col1 = getComputedStyle(document.documentElement).getPropertyValue('--red').trim();
+    var col2 = getComputedStyle(document.documentElement).getPropertyValue('--gold').trim();
+    var colors = color === 'red' ? [col1, col2, '#F2D77E'] : [col2, col1, '#F2D77E'];
+    for(var i=0;i<90;i++){
+      particles.push({
+        x: canvas.width/2 + (Math.random()-0.5)*220,
+        y: canvas.height*0.35,
+        vx: (Math.random()-0.5)*9,
+        vy: -Math.random()*9 - 4,
+        g: 0.28 + Math.random()*0.12,
+        size: 4 + Math.random()*5,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        rot: Math.random()*Math.PI,
+        vr: (Math.random()-0.5)*0.3,
+        life: 0
+      });
+    }
+    if(!confettiRunning){ confettiRunning = true; requestAnimationFrame(tick); }
+  }
+
+  function tick(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(function(p){
+      p.vy += p.g;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      p.life++;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = Math.max(0, 1 - p.life/140);
+      ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size*0.6);
+      ctx.restore();
+    });
+    particles = particles.filter(function(p){ return p.life < 140 && p.y < canvas.height + 40; });
+    if(particles.length > 0){
+      requestAnimationFrame(tick);
+    } else {
+      confettiRunning = false;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+  }
+
+  score1El.textContent = scores[1] + (scores[1]===1?' win':' wins');
+  score2El.textContent = scores[2] + (scores[2]===1?' win':' wins');
+  newGame();
+})();
+</script>
+</body>
+</html>
