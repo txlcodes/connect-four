@@ -348,7 +348,7 @@
     <span class="vs">vs</span>
     <div class="player-card p2" id="card2" style="--turn-color:var(--gold)">
       <div class="player-meta">
-        <input class="player-name" id="name2" value="Her" maxlength="16" aria-label="Player two name" />
+        <input class="player-name" id="name2" value="Aimen" maxlength="16" aria-label="Player two name" />
         <span class="score" id="score2">0 wins</span>
       </div>
       <span class="chip gold"></span>
@@ -392,6 +392,14 @@
     if(savedNames){ name1.value = savedNames[0]; name2.value = savedNames[1]; }
     var savedScores = JSON.parse(localStorage.getItem('c4-scores') || 'null');
     if(savedScores){ scores = savedScores; }
+  }catch(e){}
+
+  // URL params override everything: ?p1=Talha&p2=Aimen
+  try{
+    var qs = new URLSearchParams(location.search);
+    if(qs.get('p1')) name1.value = qs.get('p1').slice(0,16);
+    if(qs.get('p2')) name2.value = qs.get('p2').slice(0,16);
+    if(qs.get('p1') || qs.get('p2')) localStorage.setItem('c4-names', JSON.stringify([name1.value, name2.value]));
   }catch(e){}
 
   function saveNames(){
