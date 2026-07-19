@@ -489,7 +489,8 @@
     var fallTime = 0.36 + (ROWS - 1 - r) * 0.045;
     disc.style.setProperty('--fall-time', fallTime + 's');
     cellEl.appendChild(disc);
-    requestAnimationFrame(function(){ disc.classList.add('dropped'); });
+    void disc.offsetWidth; // force reflow so the drop animation starts from the initial state
+    disc.classList.add('dropped');
 
     var winLine = checkWin(c, r);
     var isDraw = !winLine && boardFull();
