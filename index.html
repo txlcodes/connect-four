@@ -276,7 +276,7 @@
     justify-content:center;
     flex-wrap:wrap;
   }
-  button.action{
+  .action{
     font-family:inherit;
     font-weight:600;
     font-size:0.85rem;
@@ -289,14 +289,14 @@
     cursor:pointer;
     transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
   }
-  button.action:hover{ transform:translateY(-1px); box-shadow:0 6px 14px -6px rgba(0,0,0,0.3); }
-  button.action:active{ transform:translateY(0); }
-  button.action.primary{
+  .action:hover{ transform:translateY(-1px); box-shadow:0 6px 14px -6px rgba(0,0,0,0.3); }
+  .action:active{ transform:translateY(0); }
+  .action.primary{
     background:linear-gradient(155deg, var(--wood-light), var(--wood));
     color:#F4EFE2;
     border-color:var(--wood-dark);
   }
-  button.action.ghost{
+  .action.ghost{
     border-color:transparent;
     background:transparent;
     color:var(--ink-soft);
@@ -308,6 +308,32 @@
     text-align:center;
     max-width:34ch;
   }
+
+  .room-bar{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:0.6rem;
+    background:var(--paper-2);
+    border-radius:16px;
+    padding:0.8rem 1.2rem;
+    width:100%;
+    max-width:480px;
+    text-align:center;
+  }
+  .room-status{
+    font-size:0.88rem;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .room-status .dot{
+    display:inline-block;
+    width:8px;height:8px;border-radius:50%;
+    margin-right:6px;
+    background:var(--gold);
+  }
+  .room-status.live .dot{ background:#3E9B5F; }
+  a.action{ text-decoration:none; display:inline-block; }
 
   canvas#confetti{
     position:fixed; inset:0;
@@ -322,7 +348,7 @@
 
   @media (prefers-reduced-motion: reduce){
     .disc.dropped, .disc.win, .disc.win::after{ animation:none !important; transform:translateY(0); opacity:1; }
-    button.action:hover{ transform:none; }
+    .action:hover{ transform:none; }
   }
 </style>
 </head>
@@ -363,12 +389,19 @@
 
   <div class="controls">
     <button class="action primary" id="newGameBtn">New Game</button>
+    <button class="action" id="playOnlineBtn">🌐 Play Online</button>
     <button class="action ghost" id="resetScoreBtn">Reset Scores</button>
+  </div>
+
+  <div class="room-bar" id="roomBar" hidden>
+    <span class="room-status" id="roomStatus">Connecting…</span>
+    <a class="action primary" id="waShare" target="_blank" rel="noopener" hidden>Share on WhatsApp</a>
   </div>
 
   <footer>Tap a column to drop your piece. First to four in a row wins the round.</footer>
 </div>
 
+<script src="https://unpkg.com/mqtt@5/dist/mqtt.min.js"></script>
 <script>
 (function(){
   "use strict";
@@ -475,11 +508,13 @@
     return -1;
   }
 
-  function handleMove(c){
+  function handleMove(c, fromNet){
     if(gameOver) return;
+    if(online.active && !fromNet && current !== online.myColor) return; // not your turn in online mode
     var r = lowestEmptyRow(c);
     if(r === -1) return;
     board[c][r] = current;
+    if(online.active && !fromNet) netSend({type:'move', col:c});
 
     var colEl = colsEl.children[c];
     colEl.classList.add('disabled');
@@ -560,7 +595,10 @@
     turnStatus();
   }
 
-  document.getElementById('newGameBtn').addEventListener('click', newGame);
+  document.getElementById('newGameBtn').addEventListener('click', function(){
+    newGame();
+    if(online.active) netSend({type:'reset'});
+  });
   document.getElementById('resetScoreBtn').addEventListener('click', function(){
     scores = {1:0,2:0};
     score1El.textContent = '0 wins';
@@ -666,9 +704,123 @@
     }
   }
 
+  // ---- online play: room sync over public MQTT broker ----
+  var online = { active:false, room:null, myColor:0, client:null, id: Math.random().toString(36).slice(2,10) };
+  var roomBar = document.getElementById('roomBar');
+  var roomStatus = document.getElementById('roomStatus');
+  var waShare = document.getElementById('waShare');
+  var playOnlineBtn = document.getElementById('playOnlineBtn');
+
+  function roomTopic(){ return 'ablc4/' + online.room; }
+  function setStatus(text, live){
+    roomStatus.innerHTML = '<span class="dot"></span>' + text;
+    roomStatus.classList.toggle('live', !!live);
+  }
+  function netSend(m){
+    if(!online.client) return;
+    m.from = online.id;
+    online.client.publish(roomTopic(), JSON.stringify(m));
+  }
+
+  function shareLink(){
+    return location.origin + location.pathname + '?room=' + online.room;
+  }
+
+  function startOnline(isHost){
+    if(typeof mqtt === 'undefined'){ setStatus('Could not load network library — check internet', false); roomBar.hidden = false; return; }
+    online.active = true;
+    online.myColor = isHost ? 1 : 2;
+    roomBar.hidden = false;
+    playOnlineBtn.hidden = true;
+    setStatus(isHost ? 'Room ' + online.room + ' — waiting for player 2…' : 'Joining room ' + online.room + '…');
+    if(isHost){
+      waShare.hidden = false;
+      waShare.href = 'https://wa.me/?text=' + encodeURIComponent('Connect Four khelo mere saath! 🔴🟡 ' + shareLink());
+    }
+    newGame();
+
+    online.client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {clientId:'ablc4_' + online.id, clean:true});
+    online.client.on('connect', function(){
+      online.client.subscribe(roomTopic());
+      netSend({type:'hello'});
+    });
+    online.client.on('error', function(){ setStatus('Connection error — retrying…'); });
+    online.client.on('close', function(){ if(online.active) setStatus('Reconnecting…'); });
+    online.client.on('message', function(t, payload){
+      var m; try{ m = JSON.parse(payload.toString()); }catch(e){ return; }
+      if(!m || m.from === online.id) return;
+      handleNet(m);
+    });
+  }
+
+  function paintBoardFromState(){
+    var savedBoard = board;
+    buildBoard();
+    board = savedBoard;
+    for(var c=0;c<COLS;c++){
+      for(var r=0;r<ROWS;r++){
+        if(board[c][r]){
+          var cell = colsEl.children[c].querySelector('.cell[data-row="' + r + '"]');
+          var disc = document.createElement('div');
+          disc.className = 'disc ' + playerColor(board[c][r]) + ' dropped';
+          disc.style.setProperty('--fall-time','0.01s');
+          cell.appendChild(disc);
+        }
+      }
+    }
+    updateGhosts(); updateActiveCard(); turnStatus();
+  }
+
+  function handleNet(m){
+    if(m.type === 'hello'){
+      setStatus((online.myColor===1 ? playerName(2) : playerName(1)) + ' connected — game on!', true);
+      if(online.myColor === 1){
+        netSend({type:'state', board:board, current:current, scores:scores, n1:name1.value, n2:name2.value, over:gameOver});
+      }
+    } else if(m.type === 'state' && online.myColor === 2){
+      board = m.board; current = m.current;
+      if(m.scores) scores = m.scores;
+      if(m.n1) name1.value = m.n1;
+      if(m.n2) name2.value = m.n2;
+      gameOver = !!m.over;
+      score1El.textContent = scores[1] + (scores[1]===1?' win':' wins');
+      score2El.textContent = scores[2] + (scores[2]===1?' win':' wins');
+      paintBoardFromState();
+      setStatus(playerName(1) + ' connected — game on!', true);
+    } else if(m.type === 'move'){
+      handleMove(m.col, true);
+    } else if(m.type === 'reset'){
+      newGame();
+    }
+  }
+
+  function makeRoomCode(){
+    var chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+    var s = '';
+    for(var i=0;i<4;i++) s += chars[Math.floor(Math.random()*chars.length)];
+    return s;
+  }
+
+  playOnlineBtn.addEventListener('click', function(){
+    online.room = makeRoomCode();
+    try{ sessionStorage.setItem('c4-host-' + online.room, '1'); }catch(e){}
+    history.replaceState(null, '', '?room=' + online.room);
+    startOnline(true);
+  });
+
+  // auto-join if opened with ?room=
+  try{
+    var qsRoom = new URLSearchParams(location.search).get('room');
+    if(qsRoom){
+      online.room = qsRoom.toUpperCase();
+      var amHost = sessionStorage.getItem('c4-host-' + online.room) === '1';
+      startOnline(amHost);
+    }
+  }catch(e){}
+
   score1El.textContent = scores[1] + (scores[1]===1?' win':' wins');
   score2El.textContent = scores[2] + (scores[2]===1?' win':' wins');
-  newGame();
+  if(!online.active) newGame();
 })();
 </script>
 </body>
