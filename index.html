@@ -27,22 +27,10 @@
     --glow:#F2D77E;
     --shadow: 0 18px 40px -12px rgba(18,51,40,0.45);
     --radius-lg: 28px;
+    color-scheme: light;
   }
-  @media (prefers-color-scheme: dark){
-    :root{
-      --paper:#15130F;
-      --paper-2:#1B1913;
-      --ink:#EFEAD9;
-      --ink-soft:#B3AC96;
-      --board:#0E2B22;
-      --board-dark:#081C16;
-      --board-hole:#1B1913;
-      --wood:#4A2C18;
-      --wood-dark:#2E1A0E;
-      --wood-light:#6B4226;
-      --shadow: 0 18px 44px -12px rgba(0,0,0,0.6);
-    }
-  }
+  /* Intentionally always light/warm — the walnut-and-felt look is the design,
+     not a theme that should flip to a muddy near-black on OS dark mode. */
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
