@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Connect Four</title>
 <meta name="description" content="A cozy two-player Connect Four game — drop discs on a walnut-framed board and connect four in a row." />
+<meta name="color-scheme" content="light only" />
+<meta name="theme-color" content="#EEEDE1" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔴</text></svg>" />
 <style>
   :root{
@@ -27,11 +29,15 @@
     --glow:#F2D77E;
     --shadow: 0 18px 40px -12px rgba(18,51,40,0.45);
     --radius-lg: 28px;
-    color-scheme: light;
+    color-scheme: light only;
   }
   /* Intentionally always light/warm — the walnut-and-felt look is the design,
      not a theme that should flip to a muddy near-black on OS dark mode. */
   *{box-sizing:border-box;}
+  /* Author rules with `display` on the same element must never win over [hidden] —
+     otherwise .room-bar/.action's own display:flex/inline-block permanently
+     shows an element the JS explicitly hid (this broke the online-room UI). */
+  [hidden]{ display:none !important; }
   html,body{margin:0;padding:0;}
   body{
     background:
