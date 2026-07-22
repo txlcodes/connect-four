@@ -329,6 +329,88 @@
   .room-status.live .dot{ background:#3E9B5F; }
   a.action{ text-decoration:none; display:inline-block; }
 
+  .chat-box{
+    display:flex;
+    flex-direction:column;
+    gap:0.6rem;
+    width:100%;
+    max-width:480px;
+    background:var(--paper-2);
+    border-radius:16px;
+    padding:0.75rem;
+  }
+  .chat-log{
+    display:flex;
+    flex-direction:column;
+    gap:0.4rem;
+    max-height:180px;
+    overflow-y:auto;
+    padding-right:0.2rem;
+  }
+  .chat-log:empty::before{
+    content:"Messages with " attr(data-partner) " show up here.";
+    color:var(--ink-soft);
+    font-size:0.82rem;
+    font-style:italic;
+  }
+  .chat-msg{
+    max-width:78%;
+    padding:0.45rem 0.75rem;
+    border-radius:14px;
+    font-size:0.86rem;
+    line-height:1.35;
+    word-wrap:break-word;
+    align-self:flex-start;
+    background:var(--paper);
+    border:1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  }
+  .chat-msg .who{
+    display:block;
+    font-size:0.68rem;
+    font-weight:700;
+    letter-spacing:0.02em;
+    margin-bottom:0.1rem;
+    opacity:0.8;
+  }
+  .chat-msg.mine{
+    align-self:flex-end;
+    background:color-mix(in srgb, var(--red) 14%, var(--paper));
+    border-color:color-mix(in srgb, var(--red) 25%, transparent);
+  }
+  .chat-msg.mine.gold{
+    background:color-mix(in srgb, var(--gold) 18%, var(--paper));
+    border-color:color-mix(in srgb, var(--gold) 30%, transparent);
+  }
+  .chat-row{
+    display:flex;
+    gap:0.5rem;
+  }
+  .chat-input{
+    flex:1;
+    font-family:inherit;
+    font-size:0.9rem;
+    padding:0.6rem 0.85rem;
+    border-radius:999px;
+    border:1.5px solid color-mix(in srgb, var(--ink) 15%, transparent);
+    background:var(--paper);
+    color:var(--ink);
+    outline:none;
+    min-width:0;
+  }
+  .chat-input:focus{ border-color:var(--wood); }
+  .chat-send{
+    flex:none;
+    width:2.4rem;height:2.4rem;
+    border-radius:50%;
+    border:none;
+    background:linear-gradient(155deg, var(--wood-light), var(--wood));
+    color:#F4EFE2;
+    font-size:1.05rem;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .chat-send:active{ transform:scale(0.94); }
+
   canvas#confetti{
     position:fixed; inset:0;
     pointer-events:none;
@@ -390,6 +472,14 @@
   <div class="room-bar" id="roomBar" hidden>
     <span class="room-status" id="roomStatus">Connecting…</span>
     <a class="action primary" id="waShare" target="_blank" rel="noopener" hidden>Share on WhatsApp</a>
+  </div>
+
+  <div class="chat-box" id="chatBox" hidden>
+    <div class="chat-log" id="chatLog" aria-live="polite"></div>
+    <form class="chat-row" id="chatForm">
+      <input class="chat-input" id="chatInput" type="text" maxlength="200" placeholder="Say something…" autocomplete="off" aria-label="Chat message" />
+      <button class="chat-send" type="submit" aria-label="Send message">➤</button>
+    </form>
   </div>
 
   <footer>Tap a column to drop your piece. First to four in a row wins the round.</footer>
@@ -704,6 +794,32 @@
   var roomStatus = document.getElementById('roomStatus');
   var waShare = document.getElementById('waShare');
   var playOnlineBtn = document.getElementById('playOnlineBtn');
+  var chatBox = document.getElementById('chatBox');
+  var chatLog = document.getElementById('chatLog');
+  var chatForm = document.getElementById('chatForm');
+  var chatInput = document.getElementById('chatInput');
+
+  function addChatBubble(text, isMine, senderName){
+    var b = document.createElement('div');
+    b.className = 'chat-msg' + (isMine ? ' mine ' + playerColor(online.myColor) : '');
+    var who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = senderName;
+    var body = document.createElement('span');
+    body.textContent = text;
+    b.appendChild(who); b.appendChild(body);
+    chatLog.appendChild(b);
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  chatForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    var text = chatInput.value.trim().slice(0, 200);
+    if(!text || !online.active) return;
+    addChatBubble(text, true, playerName(online.myColor));
+    netSend({type:'chat', text: text, name: playerName(online.myColor)});
+    chatInput.value = '';
+  });
 
   function roomTopic(){ return 'ablc4/' + online.room; }
   function setStatus(text, live){
@@ -725,6 +841,8 @@
     online.active = true;
     online.myColor = isHost ? 1 : 2;
     roomBar.hidden = false;
+    chatBox.hidden = false;
+    chatLog.setAttribute('data-partner', isHost ? playerName(2) : playerName(1));
     playOnlineBtn.hidden = true;
     setStatus(isHost ? 'Room ' + online.room + ' — waiting for player 2…' : 'Joining room ' + online.room + '…');
     if(isHost){
@@ -785,6 +903,8 @@
       handleMove(m.col, true);
     } else if(m.type === 'reset'){
       newGame();
+    } else if(m.type === 'chat'){
+      addChatBubble(m.text, false, m.name || (online.myColor===1 ? playerName(2) : playerName(1)));
     }
   }
 
